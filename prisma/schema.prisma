@@ -1,0 +1,50 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  VOTER
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  uniqueID  String   @unique
+  password  String
+  role      Role     @default(VOTER)
+  hasVoted  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Candidate {
+  id        Int      @id @default(autoincrement())
+  name      String
+  party     String
+  voteCount Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Block {
+  id           Int      @id @default(autoincrement())
+  index        Int      @unique
+  timestamp    String
+  data         String   // JSON string of vote data
+  previousHash String
+  hash         String
+  nonce        Int
+  createdAt    DateTime @default(now())
+}
+
+model Election {
+  id        Int      @id @default(autoincrement())
+  isOpen    Boolean  @default(true)
+  endTime   DateTime?
+}
