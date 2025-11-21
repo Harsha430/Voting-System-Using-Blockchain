@@ -1,104 +1,103 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { getContract } from '@/lib/blockchainConfig';
+import ConnectWallet from '@/components/ConnectWallet';
 
 interface Candidate {
   id: number;
   name: string;
-  party: string;
   voteCount: number;
-}
-
-interface Block {
-  index: number;
-  timestamp: string;
-  data: string;
-  previousHash: string;
-  hash: string;
 }
 
 export default function AdminDashboard() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [blocks, setBlocks] = useState<Block[]>([]);
   const [newCandidateName, setNewCandidateName] = useState('');
-  const [newCandidateParty, setNewCandidateParty] = useState('');
   const [electionOpen, setElectionOpen] = useState(true);
-  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    if (user.role !== 'ADMIN') {
-      router.push('/login');
-    }
-
-    fetchCandidates();
-    fetchElectionStatus();
-    // In a real app, we'd have a route to fetch blocks. For now, we can't easily visualize the chain without an API.
-    // Let's add a simple API for blocks if needed, or just skip for now.
+    loadBlockchainData();
   }, []);
 
-  const fetchCandidates = async () => {
-    const res = await fetch('/api/candidates');
-    const data = await res.json();
-    setCandidates(data);
-  };
+  const loadBlockchainData = async () => {
+    try {
+      const contract = await getContract();
+      
+      // Check election status
+      const status = await contract.votingActive();
+      setElectionOpen(status);
 
-  const fetchElectionStatus = async () => {
-    const res = await fetch('/api/election');
-    const data = await res.json();
-    setElectionOpen(data.isOpen);
+      // Fetch candidates
+      const count = await contract.candidatesCount();
+      const loadedCandidates = [];
+      for (let i = 0; i < Number(count); i++) {
+        const candidate = await contract.getCandidate(i);
+        loadedCandidates.push({
+          id: i,
+          name: candidate.name,
+          voteCount: Number(candidate.count),
+        });
+      }
+      setCandidates(loadedCandidates);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error loading blockchain data:", error);
+      setLoading(false);
+    }
   };
 
   const handleAddCandidate = async (e: React.FormEvent) => {
     e.preventDefault();
-    await fetch('/api/candidates', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newCandidateName, party: newCandidateParty }),
-    });
-    setNewCandidateName('');
-    setNewCandidateParty('');
-    fetchCandidates();
-    fetchCandidates();
-  };
-
-  const handleRemoveCandidate = async (id: number) => {
-    if (!confirm('Are you sure you want to remove this candidate?')) return;
-    
-    await fetch('/api/candidates', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
-    fetchCandidates();
+    try {
+      setMessage('Confirm adding candidate in MetaMask...');
+      const contract = await getContract();
+      const tx = await contract.addCandidate(newCandidateName);
+      setMessage('Transaction sent! Waiting for confirmation...');
+      await tx.wait();
+      setMessage('Candidate added successfully!');
+      setNewCandidateName('');
+      loadBlockchainData();
+    } catch (err: any) {
+      console.error(err);
+      setMessage('Failed to add candidate: ' + (err.reason || err.message));
+    }
   };
 
   const toggleElection = async () => {
-    const newState = !electionOpen;
-    await fetch('/api/election', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isOpen: newState }),
-    });
-    setElectionOpen(newState);
+    try {
+      const newState = !electionOpen;
+      setMessage(`Confirm ${newState ? 'starting' : 'stopping'} election in MetaMask...`);
+      const contract = await getContract();
+      const tx = await contract.setVotingStatus(newState);
+      setMessage('Transaction sent! Waiting for confirmation...');
+      await tx.wait();
+      setMessage(`Election ${newState ? 'started' : 'stopped'} successfully!`);
+      setElectionOpen(newState);
+    } catch (err: any) {
+      console.error(err);
+      setMessage('Failed to update election status: ' + (err.reason || err.message));
+    }
   };
+
+  if (loading) {
+    return <div className="p-8 text-center">Loading blockchain data...</div>;
+  }
 
   return (
     <div className="min-h-screen p-8 bg-gray-100 dark:bg-zinc-900">
       <div className="max-w-6xl mx-auto space-y-8">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <button
-            onClick={() => {
-              localStorage.removeItem('user');
-              router.push('/login');
-            }}
-            className="px-4 py-2 text-white bg-red-600 rounded hover:bg-red-700"
-          >
-            Logout
-          </button>
+          <ConnectWallet />
         </div>
+
+        {message && (
+          <div className="p-4 bg-blue-100 text-blue-800 rounded dark:bg-blue-900 dark:text-blue-200">
+            {message}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Election Control */}
@@ -131,16 +130,6 @@ export default function AdminDashboard() {
                   required
                 />
               </div>
-              <div>
-                <input
-                  type="text"
-                  placeholder="Party"
-                  value={newCandidateParty}
-                  onChange={(e) => setNewCandidateParty(e.target.value)}
-                  className="w-full p-2 border rounded dark:bg-zinc-700 dark:border-zinc-600"
-                  required
-                />
-              </div>
               <button
                 type="submit"
                 className="w-full p-2 text-white bg-blue-600 rounded hover:bg-blue-700"
@@ -160,9 +149,7 @@ export default function AdminDashboard() {
                 <tr className="border-b dark:border-zinc-700">
                   <th className="p-2">ID</th>
                   <th className="p-2">Name</th>
-                  <th className="p-2">Party</th>
                   <th className="p-2">Votes</th>
-                  <th className="p-2">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -170,16 +157,7 @@ export default function AdminDashboard() {
                   <tr key={candidate.id} className="border-b dark:border-zinc-700">
                     <td className="p-2">{candidate.id}</td>
                     <td className="p-2">{candidate.name}</td>
-                    <td className="p-2">{candidate.party}</td>
                     <td className="p-2 font-bold">{candidate.voteCount}</td>
-                    <td className="p-2">
-                      <button
-                        onClick={() => handleRemoveCandidate(candidate.id)}
-                        className="px-2 py-1 text-sm text-white bg-red-500 rounded hover:bg-red-600"
-                      >
-                        Remove
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>

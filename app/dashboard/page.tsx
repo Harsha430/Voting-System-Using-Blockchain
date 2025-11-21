@@ -1,91 +1,91 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { getContract, getEthereum } from '@/lib/blockchainConfig';
+import ConnectWallet from '@/components/ConnectWallet';
 
 interface Candidate {
   id: number;
   name: string;
-  party: string;
+  voteCount: number;
 }
 
 export default function VoterDashboard() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [user, setUser] = useState<any>(null);
   const [electionOpen, setElectionOpen] = useState(true);
+  const [hasVoted, setHasVoted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const router = useRouter();
 
   useEffect(() => {
-    const userData = JSON.parse(localStorage.getItem('user') || '{}');
-    if (!userData.uniqueID) {
-      router.push('/login');
-      return;
-    }
-    setUser(userData);
-
-    fetchCandidates();
-    fetchElectionStatus();
+    loadBlockchainData();
   }, []);
 
-  const fetchCandidates = async () => {
-    const res = await fetch('/api/candidates');
-    const data = await res.json();
-    setCandidates(data);
-  };
+  const loadBlockchainData = async () => {
+    try {
+      const eth = getEthereum();
+      if (!eth) return;
 
-  const fetchElectionStatus = async () => {
-    const res = await fetch('/api/election');
-    const data = await res.json();
-    setElectionOpen(data.isOpen);
+      const contract = await getContract();
+      
+      // Check election status
+      const status = await contract.votingActive();
+      setElectionOpen(status);
+
+      // Check if user has voted
+      const accounts = await eth.request({ method: 'eth_accounts' });
+      if (accounts.length > 0) {
+        const voted = await contract.hasVoted(accounts[0]);
+        setHasVoted(voted);
+      }
+
+      // Fetch candidates
+      const count = await contract.candidatesCount();
+      const loadedCandidates = [];
+      for (let i = 0; i < Number(count); i++) {
+        const candidate = await contract.getCandidate(i);
+        loadedCandidates.push({
+          id: i,
+          name: candidate.name,
+          voteCount: Number(candidate.count),
+        });
+      }
+      setCandidates(loadedCandidates);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error loading blockchain data:", error);
+      setLoading(false);
+    }
   };
 
   const handleVote = async (candidateId: number) => {
-    if (!user) return;
-
     try {
-      const res = await fetch('/api/vote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          voterId: user.id,
-          uniqueID: user.uniqueID,
-          candidateId,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setMessage('Vote cast successfully! Block hash: ' + data.block.hash);
-        const updatedUser = { ...user, hasVoted: true };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        setUser(updatedUser);
-      } else {
-        setMessage(data.error);
-      }
-    } catch (err) {
-      setMessage('Failed to cast vote');
+      setMessage('Please confirm the transaction in MetaMask...');
+      const contract = await getContract();
+      const tx = await contract.vote(candidateId);
+      setMessage('Transaction sent! Waiting for confirmation...');
+      await tx.wait();
+      setMessage('Vote cast successfully!');
+      setHasVoted(true);
+      loadBlockchainData(); // Refresh data
+    } catch (err: any) {
+      console.error(err);
+      setMessage('Failed to cast vote: ' + (err.reason || err.message));
     }
   };
+
+  if (loading) {
+    return <div className="p-8 text-center">Loading blockchain data...</div>;
+  }
 
   return (
     <div className="min-h-screen p-8 bg-gray-100 dark:bg-zinc-900">
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Voter Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm opacity-70">ID: {user?.uniqueID}</span>
-            <button
-              onClick={() => {
-                localStorage.removeItem('user');
-                router.push('/login');
-              }}
-              className="px-4 py-2 text-white bg-red-600 rounded hover:bg-red-700"
-            >
-              Logout
-            </button>
-          </div>
+          <ConnectWallet />
         </div>
 
         {message && (
@@ -108,20 +108,20 @@ export default function VoterDashboard() {
             >
               <h3 className="text-xl font-bold">{candidate.name}</h3>
               <p className="text-gray-500 dark:text-gray-400 mb-4">
-                {candidate.party}
+                Candidate ID: {candidate.id}
               </p>
               <button
                 onClick={() => handleVote(candidate.id)}
-                disabled={user?.hasVoted || !electionOpen}
+                disabled={hasVoted || !electionOpen}
                 className={`w-full py-2 rounded font-semibold ${
-                  user?.hasVoted
-                    ? 'bg-gray-300 cursor-not-allowed text-gray-600'
+                  hasVoted
+                    ? 'bg-green-600 cursor-not-allowed text-white'
                     : !electionOpen
                     ? 'bg-gray-300 cursor-not-allowed text-gray-600'
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
                 }`}
               >
-                {user?.hasVoted ? 'Voted' : 'Vote'}
+                {hasVoted ? 'Voted' : 'Vote'}
               </button>
             </div>
           ))}

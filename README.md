@@ -1,24 +1,52 @@
-# Voting Using Blockchain
+# Voting DApp (Blockchain Based)
 
-A secure and transparent voting application built with Next.js, Prisma, and Blockchain concepts.
+A secure, transparent, and decentralized voting application built with **Next.js 14**, **TypeScript**, and **Ethereum Smart Contracts (Sepolia Testnet)**.
+
+## 🌟 Features
+
+-   **Decentralized Voting:** Votes are stored immutably on the Ethereum blockchain.
+-   **Admin Dashboard:**
+    -   Start/Stop Elections.
+    -   Add/Remove Candidates.
+    -   Assign Voter IDs to Wallet Addresses.
+    -   Real-time status updates.
+-   **Voter Dashboard:**
+    -   Secure Login with Voter ID & Password.
+    -   One-vote-per-person enforcement.
+    -   Real-time candidate list.
+-   **Live Results:**
+    -   Real-time vote counting.
+    -   Automatic winner declaration.
+    -   Handling of "Draw" and "No Votes" scenarios.
+-   **Security:**
+    -   Metamask Wallet integration.
+    -   Role-based access control (Admin vs Voter).
+
+## 🛠️ Tech Stack
+
+-   **Frontend:** Next.js 14 (App Router), TypeScript, Tailwind CSS.
+-   **Blockchain:** Solidity, Ethers.js v6.
+-   **Network:** Sepolia Testnet.
+-   **Wallet:** MetaMask.
+
+## 📜 Smart Contract
+
+-   **Network:** Sepolia
+-   **Contract Address:** `0x6b038e4F513B8AA6677420e349bF80A02FEd5344`
 
 ## 🚀 Getting Started
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
-
 ### Prerequisites
 
-Before you begin, ensure you have the following installed on your machine:
+1.  **Node.js** (v18+) installed.
+2.  **MetaMask** extension installed in your browser.
+3.  Some **Sepolia ETH** (for gas fees).
 
-- **Node.js** (v18 or higher recommended)
-- **npm** (usually comes with Node.js)
-- **PostgreSQL** (running locally or a cloud instance)
-
-### 🛠️ Installation
+### Installation
 
 1.  **Clone the repository**
     ```bash
-    git clone <repository-url>
+    git clone https://github.com/Harsha430/Voting-System-Using-Blockchain.git
     cd "Voting Using Blockchain"
     ```
 
@@ -27,45 +55,30 @@ Before you begin, ensure you have the following installed on your machine:
     npm install
     ```
 
-3.  **Environment Setup**
-    Create a `.env` file in the root directory of the project. You can use the example below:
-
-    ```env
-    # Connect to your PostgreSQL database
-    DATABASE_URL="postgresql://username:password@localhost:5432/votingDb?schema=public"
-    ```
-    *Replace `username`, `password`, and `votingDb` with your actual PostgreSQL credentials.*
-
-4.  **Database Setup**
-    Initialize the database schema using Prisma:
+3.  **Run the application**
     ```bash
-    npx prisma generate
-    npx prisma db push
+    npm run dev
     ```
 
-### 🏃‍♂️ Running the Project
+4.  Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-To start the development server:
+## � Usage Guide
 
-```bash
-npm run dev
-```
+### 1. Admin Setup
+-   Navigate to `/admin/login`.
+-   Login with your Admin credentials.
+-   Claim Admin rights (if first time) or login.
+-   Add Candidates and Assign Voters.
+-   Click **"Start Election"**.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Voting
+-   Voters navigate to `/voter/login`.
+-   Enter Voter ID and Password.
+-   Cast your vote on the dashboard.
 
-### 📂 Project Structure
-
-- `/app`: Next.js App Router pages and API routes.
-- `/prisma`: Database schema and migrations.
-- `/lib`: Utility functions and shared code.
-- `/components`: Reusable UI components (if applicable).
-
-### 📜 Scripts
-
-- `npm run dev`: Runs the app in development mode.
-- `npm run build`: Builds the app for production.
-- `npm start`: Starts the production server.
-- `npm run lint`: Runs the linter to check for code issues.
+### 3. Results
+-   Visit `/results` to see live updates.
+-   When Admin stops the election, the winner is declared automatically.
 
 ## 🤝 Contributing
 
